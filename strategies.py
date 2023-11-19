@@ -8,7 +8,6 @@ from draughts.engine import PlayResult
 import random
 from engine_wrapper import EngineWrapper
 
-
 class FillerEngine:
     """
     Not meant to be an actual engine.
@@ -117,3 +116,28 @@ class FirstMovePDN(ExampleEngine):
                                                               board_move=board_move), moves))
         pdn_moves.sort(key=lambda move: move.pdn_move)
         return PlayResult(pdn_moves[0], None, {})
+
+class Tenxten (MinimalEngine):
+
+    def search(self, game, *args):
+        player_color = game.board.player_turn
+        moves = game.legal_moves()[0]
+        evaluation_dict = {True: 4, False: 1}
+        score_list = []
+        for move in moves:
+            new_board = game.copy().push(move)
+            position_dict = new_board.board.searcher.position_pieces
+            
+            score = 0
+            for field_number, piece in position_dict.items():
+                if(piece.player == player_color):
+                    temp = 1
+                else:
+                    temp = -1
+                score += evaluation_dict[piece.king]*temp
+            score_list.append(score)
+            
+        best_move_index = score_list.index(max(score_list))
+        print(moves[best_move_index])
+        return PlayResult(draughts.Move(board_move=moves[best_move_index]), None, {})
+    
