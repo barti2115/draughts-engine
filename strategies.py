@@ -117,27 +117,54 @@ class FirstMovePDN(ExampleEngine):
         pdn_moves.sort(key=lambda move: move.pdn_move)
         return PlayResult(pdn_moves[0], None, {})
 
-class Tenxten (MinimalEngine):
+class Tenxten(MinimalEngine):
+    def __init__(self, commands, options, stderr, draw_or_resign, name=None, **popen_args):
+        super().__init__(commands, options, stderr, draw_or_resign, name, **popen_args)
+        self.counter = 0
 
+    def evaluate_position(self, position, player_color):
+        evaluation_dict = {True: 4, False: 1}
+        score = 0
+        for field_number, piece in position.items():
+            if piece.player == player_color:
+                temp = 1
+            else:
+                temp = -1
+            score += evaluation_dict[piece.king] * temp
+        self.counter += 1
+        return score
+
+    def recursive_search(self, game, depth, player_color):
+        if depth == 0:
+            return self.evaluate_position(game.board.searcher.position_pieces, player_color)
+
+        legal_moves = game.legal_moves()[0]
+        if not legal_moves:
+            return 0
+        scores = []
+
+        for move in legal_moves:
+            new_game = game.copy().push(move)
+            score = self.recursive_search(new_game, depth - 1, player_color)
+            scores.append(score)
+        if game.board.player_turn == player_color:
+            return max(scores)
+        else:
+            return min(scores)
     def search(self, game, *args):
         player_color = game.board.player_turn
         moves = game.legal_moves()[0]
-        evaluation_dict = {True: 4, False: 1}
         score_list = []
+
         for move in moves:
-            new_board = game.copy().push(move)
-            position_dict = new_board.board.searcher.position_pieces
-            
-            score = 0
-            for field_number, piece in position_dict.items():
-                if(piece.player == player_color):
-                    temp = 1
-                else:
-                    temp = -1
-                score += evaluation_dict[piece.king]*temp
+            new_game = game.copy().push(move)
+            score = self.recursive_search(new_game, 3, player_color)
             score_list.append(score)
-            
+
         best_move_index = score_list.index(max(score_list))
-        print(moves[best_move_index])
-        return PlayResult(draughts.Move(board_move=moves[best_move_index]), None, {})
+        best_move = moves[best_move_index]
+
+        print(f"Best move: {best_move}, with score: {max(score_list)} out of {self.counter} positions calculated.")
+        self.counter = 0
+        return PlayResult(draughts.Move(board_move=best_move), None, {})
     
