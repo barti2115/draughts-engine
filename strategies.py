@@ -7,7 +7,7 @@ import draughts
 from draughts.engine import PlayResult
 import random
 from engine_wrapper import EngineWrapper
-
+from decorators import timing_decorator
 class FillerEngine:
     """
     Not meant to be an actual engine.
@@ -151,6 +151,8 @@ class Tenxten(MinimalEngine):
             return max(scores)
         else:
             return min(scores)
+        
+    @timing_decorator
     def search(self, game, *args):
         player_color = game.board.player_turn
         moves = game.legal_moves()[0]
