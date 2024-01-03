@@ -6,9 +6,9 @@ And some handy classes to extend
 import draughts
 from draughts.engine import PlayResult
 import random
+import cityhash
 from engine_wrapper import EngineWrapper
 from decorators import timing_decorator
-import time
 class FillerEngine:
     """
     Not meant to be an actual engine.
@@ -123,16 +123,6 @@ class Tenxten(MinimalEngine):
         super().__init__(commands, options, stderr, draw_or_resign, name, **popen_args)
         self.counter = 0
         self.transposition_table = {}
-        self.transposition_ttl = 15
-
-    def clear_stale_entries(self):
-        current_time = time.time()
-        keys_to_remove = [key for key, (timestamp, _) in self.transposition_table.items() if current_time - timestamp > self.transposition_ttl]
-        entries_cleared = 0
-        for key in keys_to_remove:
-            del self.transposition_table[key]
-            entries_cleared += 1
-        print(f"{entries_cleared} entries has been deleted")
 
     def evaluate_position(self, position, player_color):
         evaluation_dict = {True: 4, False: 1}
@@ -147,13 +137,13 @@ class Tenxten(MinimalEngine):
         return score
 
     def recursive_search(self, game, depth, player_color):
-        key = game
+        key = cityhash.CityHash64(game.get_fen())
         if key in self.transposition_table:
-            return self.transposition_table[key][1]
+            return self.transposition_table[key]
         
         if depth == 0:
             score = self.evaluate_position(game.board.searcher.position_pieces, player_color)
-            self.transposition_table[key] = (time.time(), score)
+            self.transposition_table[key] = score
             return score
 
         legal_moves = game.legal_moves()[0]
@@ -170,11 +160,11 @@ class Tenxten(MinimalEngine):
             scores.append(score)
         if game.board.player_turn == player_color:
             max_score = max(scores)
-            self.transposition_table[key] = (time.time(), max_score)
+            self.transposition_table[key] = max_score
             return max_score
         else:
             min_score = min(scores)
-            self.transposition_table[key] = (time.time(), min_score)
+            self.transposition_table[key] = min_score
             return min_score
         
     @timing_decorator
@@ -182,7 +172,6 @@ class Tenxten(MinimalEngine):
         player_color = game.board.player_turn
         moves = game.legal_moves()[0]
         score_list = []
-        self.clear_stale_entries()
         for move in moves:
             new_game = game.copy().push(move)
             score = self.recursive_search(new_game, 3, player_color)
@@ -195,5 +184,6 @@ class Tenxten(MinimalEngine):
         print(f"{len(self.transposition_table)} positions are stored in transposition table.")
 
         self.counter = 0
+        self.transposition_table = {}
         return PlayResult(draughts.Move(board_move=best_move), None, {})
     
