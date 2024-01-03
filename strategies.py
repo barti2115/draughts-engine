@@ -122,25 +122,28 @@ class Tenxten(MinimalEngine):
     def __init__(self, commands, options, stderr, draw_or_resign, name=None, **popen_args):
         super().__init__(commands, options, stderr, draw_or_resign, name, **popen_args)
         self.counter = 0
+        self.cuts_made = 0
+        self.transposition_table_used = 0
         self.transposition_table = {}
 
     def evaluate_position(self, position, player_color):
         evaluation_dict = {True: 4, False: 1}
         score = 0
+        self.counter += 1
         for field_number, piece in position.items():
             if piece.player == player_color:
                 temp = 1
             else:
                 temp = -1
             score += evaluation_dict[piece.king] * temp
-        self.counter += 1
         return score
 
-    def recursive_search(self, game, depth, player_color):
+    def recursive_search(self, game, depth, player_color, alpha = -float('inf'), beta = float('inf')):
         key = cityhash.CityHash64(game.get_fen())
         if key in self.transposition_table:
+            self.transposition_table_used += 1
             return self.transposition_table[key]
-        
+
         if depth == 0:
             score = self.evaluate_position(game.board.searcher.position_pieces, player_color)
             self.transposition_table[key] = score
@@ -152,20 +155,33 @@ class Tenxten(MinimalEngine):
                 return 100
             else:
                 return -100
+            
         scores = []
 
-        for move in legal_moves:
-            new_game = game.copy().push(move)
-            score = self.recursive_search(new_game, depth - 1, player_color)
-            scores.append(score)
         if game.board.player_turn == player_color:
-            max_score = max(scores)
-            self.transposition_table[key] = max_score
-            return max_score
+            maxEva = -float('inf')
+            for move in legal_moves:
+                new_game = game.copy().push(move)
+                score = self.recursive_search(new_game, depth - 1, player_color, alpha, beta)
+                maxEva = max(maxEva,score)
+                alpha = max(alpha, score)
+                if beta <= alpha:
+                    self.cuts_made += 1
+                    break
+            self.transposition_table[key] = maxEva
+            return maxEva
         else:
-            min_score = min(scores)
-            self.transposition_table[key] = min_score
-            return min_score
+            minEva = float('inf')
+            for move in legal_moves:
+                new_game = game.copy().push(move)
+                score = self.recursive_search(new_game, depth - 1, player_color, alpha, beta)
+                minEva = min(minEva,score)
+                beta = min(beta, score)
+                if beta <= alpha:
+                    self.cuts_made += 1
+                    break
+            self.transposition_table[key] = minEva
+            return minEva
         
     @timing_decorator
     def search(self, game, *args):
@@ -174,7 +190,7 @@ class Tenxten(MinimalEngine):
         score_list = []
         for move in moves:
             new_game = game.copy().push(move)
-            score = self.recursive_search(new_game, 3, player_color)
+            score = self.recursive_search(new_game, 4, player_color)
             score_list.append(score)
 
         best_move_index = score_list.index(max(score_list))
@@ -182,8 +198,12 @@ class Tenxten(MinimalEngine):
 
         print(f"Best move: {best_move}, with score: {max(score_list)} out of {self.counter} positions calculated.")
         print(f"{len(self.transposition_table)} positions are stored in transposition table.")
+        print(f"Transposition table was used: {self.transposition_table_used} times.")
+        print(f"Cuts made: {self.cuts_made}.")
 
         self.counter = 0
+        self.cuts_made = 0
         self.transposition_table = {}
+        self.transposition_table_used = 0
         return PlayResult(draughts.Move(board_move=best_move), None, {})
     
