@@ -156,12 +156,10 @@ class Tenxten(MinimalEngine):
             else:
                 return -100
             
-        scores = []
-
         if game.board.player_turn == player_color:
             maxEva = -float('inf')
             for move in legal_moves:
-                new_game = game.copy().push(move)
+                new_game = game.copy_fast().push(move)
                 score = self.recursive_search(new_game, depth - 1, player_color, alpha, beta)
                 maxEva = max(maxEva,score)
                 alpha = max(alpha, score)
@@ -173,7 +171,7 @@ class Tenxten(MinimalEngine):
         else:
             minEva = float('inf')
             for move in legal_moves:
-                new_game = game.copy().push(move)
+                new_game = game.copy_fast().push(move)
                 score = self.recursive_search(new_game, depth - 1, player_color, alpha, beta)
                 minEva = min(minEva,score)
                 beta = min(beta, score)
@@ -187,10 +185,12 @@ class Tenxten(MinimalEngine):
     def search(self, game, *args):
         player_color = game.board.player_turn
         moves = game.legal_moves()[0]
+        alpha = -float('inf')
         score_list = []
         for move in moves:
-            new_game = game.copy().push(move)
-            score = self.recursive_search(new_game, 4, player_color)
+            new_game = game.copy_fast().push(move)
+            score = self.recursive_search(new_game, 5, player_color, alpha)
+            alpha = max(alpha, score)
             score_list.append(score)
 
         best_move_index = score_list.index(max(score_list))
